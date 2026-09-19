@@ -1,14 +1,27 @@
 import { useState } from 'react';
-import { Check, ChevronRight, Upload, BookOpen, Sparkles, PenLine, Shield, Heart } from 'lucide-react';
+import { Check, ChevronRight, Upload, BookOpen, Sparkles, PenLine, Shield, Heart, Eye, Send, AlertTriangle } from 'lucide-react';
 import { TopBar } from '@/components/Navigation';
 import { supabase, LANGUAGES, SUBJECTS, CONTENT_TYPES, type ContentType, generateCode } from '@/lib/supabase';
+import { translateContent, type TranslationResult, type TermPair, type TranslationStatus, translationDirection } from '@/services/translationService';
+import {
+  SourceContent,
+  LanguageSelector,
+  TranslationEditor,
+  type TranslationPhase,
+  LanguageComparison,
+  ImportantTerms,
+  TranslationCheck,
+  type CheckItem,
+  TranslationPreview,
+  TranslationProgress,
+} from '@/components/TranslationWorkflow';
 
 interface Props {
   onBack: () => void;
   onComplete: () => void;
 }
 
-type Step = 0 | 1 | 2 | 3 | 4;
+type Step = 0 | 1 | 2 | 3 | 4 | 5;
 
 const ROLES = [
   { value: 'TEACHER', label: 'Teacher', icon: BookOpen },
@@ -26,33 +39,109 @@ export function ContributeContent({ onBack, onComplete }: Props) {
   const [contentType, setContentType] = useState<ContentType | null>(null);
   const [schoolLang, setSchoolLang] = useState('en');
   const [homeLang, setHomeLang] = useState('hi');
+
+  // Source content
   const [titleSchool, setTitleSchool] = useState('');
   const [bodySchool, setBodySchool] = useState('');
-  const [titleHome, setTitleHome] = useState('');
-  const [bodyHome, setBodyHome] = useState('');
+
+  // Translation state
+  const [translationPhase, setTranslationPhase] = useState<TranslationPhase>('idle');
+  const [translationResult, setTranslationResult] = useState<TranslationResult | null>(null);
+  const [translatedTitle, setTranslatedTitle] = useState('');
+  const [translatedBody, setTranslatedBody] = useState('');
+  const [terms, setTerms] = useState<TermPair[]>([]);
+  const [translationStatus, setTranslationStatus] = useState<TranslationStatus>('draft');
+  const [showPreview, setShowPreview] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  // Attribution
   const [contributorName, setContributorName] = useState('');
   const [contributorRole, setContributorRole] = useState<string | null>(null);
   const [attest, setAttest] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const stepTitles = ['Textbook', 'Content Type', 'Languages', 'Content', 'Attribution'];
+  const stepTitles = ['Textbook', 'Content Type', 'Languages', 'Translation', 'Attribution', 'Preview & Submit'];
 
   function next() {
-    if (step < 4) setStep((step + 1) as Step);
+    if (step < 5) setStep((step + 1) as Step);
   }
   function prev() {
     if (step === 0) onBack();
     else setStep((step - 1) as Step);
   }
 
-  async function submit() {
+  /* ===== Translation handlers ===== */
+
+  async function handleTranslate() {
+    if (schoolLang === homeLang) return;
+    setTranslationPhase('translating');
+    const result = await translateContent(schoolLang, homeLang, titleSchool, bodySchool);
+    setTranslationResult(result);
+    setTranslatedTitle(result.title);
+    setTranslatedBody(result.body);
+    setTerms(result.terms);
+    setTranslationPhase('translated');
+    setTranslationStatus('translated');
+  }
+
+  function handleRegenerate() {
+    setTranslationPhase('idle');
+    setTranslationResult(null);
+    setTranslatedTitle('');
+    setTranslatedBody('');
+    setTerms([]);
+    setTranslationStatus('draft');
+  }
+
+  function updateTerm(id: string, field: 'source' | 'target', value: string) {
+    setTerms((prev) => prev.map((t) => (t.id === id ? { ...t, [field]: value } : t)));
+  }
+
+  function addTerm() {
+    setTerms((prev) => [...prev, { id: `term-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, source: '', target: '' }]);
+  }
+
+  function removeTerm(id: string) {
+    setTerms((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  /* ===== Quality checks ===== */
+
+  const qualityChecks: CheckItem[] = [
+    { label: 'Source title is not empty', passed: !!titleSchool.trim() },
+    { label: 'Source content is not empty', passed: !!bodySchool.trim() },
+    { label: 'Translation generated', passed: translationPhase === 'translated' },
+    { label: 'Translated title is not empty', passed: !!translatedTitle.trim() },
+    { label: 'Translated content is not empty', passed: !!translatedBody.trim() },
+    {
+      label: 'Target language is different from source',
+      passed: schoolLang !== homeLang,
+      detail: schoolLang === homeLang ? 'Source and target are the same language' : undefined,
+    },
+    {
+      label: 'Important terms checked',
+      passed: terms.length === 0 || terms.every((t) => t.source.trim() && t.target.trim()),
+      detail: terms.some((t) => !t.source.trim() || !t.target.trim()) ? 'Some terms have empty fields' : undefined,
+    },
+    { label: 'No empty sections', passed: !!titleSchool.trim() && !!bodySchool.trim() && !!translatedTitle.trim() && !!translatedBody.trim() },
+  ];
+
+  const allChecksPassed = qualityChecks.every((c) => c.passed);
+
+  /* ===== Submit ===== */
+
+  async function handleSubmitForReview() {
+    if (!allChecksPassed) {
+      setSubmitError('Please fix the items that need attention before submitting.');
+      return;
+    }
     if (!attest) {
-      setError('Please confirm the attestation');
+      setSubmitError('Please confirm the attestation in the Attribution step.');
       return;
     }
     setSubmitting(true);
-    setError('');
+    setSubmitError('');
     const code = generateCode(cls!, subject!, chapter!, page!);
     const { error: insertError } = await supabase.from('textbook_content').insert({
       class_num: cls,
@@ -65,18 +154,22 @@ export function ContributeContent({ onBack, onComplete }: Props) {
       home_language: homeLang,
       title_school: titleSchool,
       body_school: bodySchool,
-      title_home: titleHome,
-      body_home: bodyHome,
+      title_home: translatedTitle,
+      body_home: translatedBody,
       contributor_name: contributorName || null,
       contributor_role: contributorRole,
     });
     setSubmitting(false);
     if (insertError) {
-      setError('Something went wrong. Please try again.');
+      setSubmitError('Something went wrong. Please try again.');
       return;
     }
+    setTranslationStatus('submitted');
     onComplete();
   }
+
+  const direction = translationDirection(schoolLang, homeLang);
+  const sameLang = schoolLang === homeLang;
 
   const canProceed =
     step === 0
@@ -84,9 +177,11 @@ export function ContributeContent({ onBack, onComplete }: Props) {
       : step === 1
       ? contentType
       : step === 2
-      ? schoolLang && homeLang
+      ? schoolLang && homeLang && !sameLang
       : step === 3
-      ? titleSchool.trim() && bodySchool.trim() && titleHome.trim() && bodyHome.trim()
+      ? translationPhase === 'translated' && !!translatedTitle.trim() && !!translatedBody.trim()
+      : step === 4
+      ? true
       : true;
 
   return (
@@ -202,29 +297,110 @@ export function ContributeContent({ onBack, onComplete }: Props) {
               <label className="mb-2 block text-xs font-semibold text-ink-soft">Home Language</label>
               <div className="grid grid-cols-3 gap-2">
                 {LANGUAGES.map((l) => (
-                  <button key={l.code} onClick={() => setHomeLang(l.code)} className={`rounded-xl border-2 p-2.5 text-center tap-scale smooth ${homeLang === l.code ? 'border-saffron bg-saffron/5' : 'border-paper-darker bg-white'}`}>
+                  <button key={l.code} onClick={() => setHomeLang(l.code)} disabled={l.code === schoolLang} className={`rounded-xl border-2 p-2.5 text-center tap-scale smooth ${homeLang === l.code ? 'border-saffron bg-saffron/5' : l.code === schoolLang ? 'border-paper-darker bg-paper-dark opacity-40' : 'border-paper-darker bg-white'}`}>
                     <span className="font-indic block text-sm font-bold text-ink">{l.nativeName}</span>
                     <span className="text-[10px] text-ink-soft">{l.name}</span>
                   </button>
                 ))}
               </div>
             </div>
+            <div className="flex items-center justify-center gap-3 rounded-xl bg-ink px-3 py-2.5 text-white">
+              <span className="font-indic text-sm font-bold">{getLangNative(schoolLang)}</span>
+              <ChevronRight size={16} className="text-saffron" />
+              <span className="font-indic text-sm font-bold text-saffron-light">{getLangNative(homeLang)}</span>
+            </div>
           </div>
         )}
 
-        {/* Step 3: Content */}
+        {/* Step 3: Translation Workflow */}
         {step === 3 && (
           <div className="space-y-4 animate-fade-in">
-            <div className="rounded-xl border-l-4 border-ink bg-white p-3">
-              <p className="mb-2 text-xs font-bold text-ink">School Language ({LANGUAGES.find((l) => l.code === schoolLang)?.name})</p>
-              <input value={titleSchool} onChange={(e) => setTitleSchool(e.target.value)} placeholder="Title in school language" className="mb-2 w-full rounded-lg border border-paper-darker bg-paper px-3 py-2 text-sm text-ink focus-ring" />
-              <textarea value={bodySchool} onChange={(e) => setBodySchool(e.target.value)} placeholder="Content in school language..." rows={4} className="w-full resize-none rounded-lg border border-paper-darker bg-paper px-3 py-2 text-sm text-ink focus-ring" />
+            {/* Status indicator */}
+            <TranslationProgress status={translationStatus} />
+
+            {/* Original content input + display */}
+            <div className="rounded-2xl border-l-4 border-ink bg-white p-4 shadow-soft">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="rounded-md bg-ink/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink">
+                  Original Content
+                </span>
+                <span className="text-xs font-bold text-ink">{LANGUAGES.find((l) => l.code === schoolLang)?.nativeName}</span>
+              </div>
+              <div className="mb-3">
+                <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-ink-soft">Title</label>
+                <input
+                  value={titleSchool}
+                  onChange={(e) => setTitleSchool(e.target.value)}
+                  placeholder="Enter title in school language"
+                  className="w-full rounded-lg border border-paper-darker bg-paper px-3 py-2 text-sm font-bold text-ink focus-ring"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-ink-soft">Content</label>
+                <textarea
+                  value={bodySchool}
+                  onChange={(e) => setBodySchool(e.target.value)}
+                  placeholder="Enter content in school language..."
+                  rows={4}
+                  className="w-full resize-none rounded-lg border border-paper-darker bg-paper px-3 py-2 text-sm leading-relaxed text-ink focus-ring"
+                />
+              </div>
             </div>
-            <div className="rounded-xl border-l-4 border-saffron bg-white p-3">
-              <p className="mb-2 text-xs font-bold text-saffron-dark">Home Language ({LANGUAGES.find((l) => l.code === homeLang)?.name})</p>
-              <input value={titleHome} onChange={(e) => setTitleHome(e.target.value)} placeholder="Title in home language" className="font-indic mb-2 w-full rounded-lg border border-paper-darker bg-paper px-3 py-2 text-sm text-ink focus-ring" />
-              <textarea value={bodyHome} onChange={(e) => setBodyHome(e.target.value)} placeholder="Content in home language..." rows={4} className="font-indic w-full resize-none rounded-lg border border-paper-darker bg-paper px-3 py-2 text-sm text-ink focus-ring" />
+
+            {/* Direction display */}
+            <div className="flex items-center justify-center gap-3 rounded-xl bg-paper-dark px-3 py-2.5">
+              <span className="font-indic text-sm font-bold text-ink">{LANGUAGES.find((l) => l.code === schoolLang)?.nativeName}</span>
+              <ChevronRight size={16} className="text-saffron" />
+              <span className="font-indic text-sm font-bold text-saffron-dark">{LANGUAGES.find((l) => l.code === homeLang)?.nativeName}</span>
             </div>
+
+            {/* Translation editor */}
+            <TranslationEditor
+              targetLang={homeLang}
+              result={translationResult ? { ...translationResult, title: translatedTitle, body: translatedBody } : null}
+              phase={translationPhase}
+              direction={direction}
+              onTranslate={handleTranslate}
+              onRegenerate={handleRegenerate}
+              onTitleChange={setTranslatedTitle}
+              onBodyChange={setTranslatedBody}
+            />
+
+            {/* Comparison */}
+            {translationPhase === 'translated' && (
+              <>
+                <LanguageComparison
+                  sourceLang={schoolLang}
+                  targetLang={homeLang}
+                  sourceTitle={titleSchool}
+                  sourceBody={bodySchool}
+                  targetTitle={translatedTitle}
+                  targetBody={translatedBody}
+                />
+
+                {/* Important terms */}
+                <ImportantTerms
+                  terms={terms}
+                  onUpdate={updateTerm}
+                  onAdd={addTerm}
+                  onRemove={removeTerm}
+                />
+
+                {/* Quality checks */}
+                <TranslationCheck checks={qualityChecks} />
+
+                {/* Mark as ready for review */}
+                {allChecksPassed && translationStatus === 'translated' && (
+                  <button
+                    onClick={() => setTranslationStatus('ready_for_review')}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-saffron/10 py-2.5 text-xs font-bold text-saffron-dark tap-scale smooth"
+                  >
+                    <Check size={14} />
+                    Mark as Ready for Review
+                  </button>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -265,12 +441,88 @@ export function ContributeContent({ onBack, onComplete }: Props) {
             {error && <p className="text-xs font-medium text-rose">{error}</p>}
           </div>
         )}
+
+        {/* Step 5: Preview & Submit */}
+        {step === 5 && (
+          <div className="space-y-4 animate-fade-in">
+            <TranslationProgress status={translationStatus} />
+
+            {/* Summary card */}
+            <div className="rounded-2xl bg-white p-4 shadow-soft">
+              <div className="mb-3 flex items-center gap-2">
+                <Sparkles size={16} className="text-saffron" />
+                <h3 className="text-sm font-bold text-ink">Translation Summary</h3>
+              </div>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-ink-soft">Textbook Code</span>
+                  <span className="font-mono font-bold text-ink">{cls && subject && chapter && page ? generateCode(cls, subject, chapter, page) : '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-ink-soft">Content Type</span>
+                  <span className="font-bold text-ink">{contentType}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-soft">Languages</span>
+                  <span className="font-indic font-bold text-ink">
+                    {LANGUAGES.find((l) => l.code === schoolLang)?.nativeName} → {LANGUAGES.find((l) => l.code === homeLang)?.nativeName}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-ink-soft">Terms</span>
+                  <span className="font-bold text-ink">{terms.filter((t) => t.source && t.target).length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-ink-soft">Status</span>
+                  <span className={`font-bold ${translationStatus === 'submitted' ? 'text-forest' : 'text-saffron-dark'}`}>
+                    {translationStatus.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quality check summary */}
+            <TranslationCheck checks={qualityChecks} />
+
+            {/* Preview button */}
+            <button
+              onClick={() => setShowPreview(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-ink bg-white py-3.5 text-sm font-bold text-ink tap-scale smooth hover:bg-paper-dark"
+            >
+              <Eye size={16} />
+              Preview Translation
+            </button>
+
+            {submitError && (
+              <div className="flex items-start gap-2 rounded-xl bg-rose/5 p-3 text-xs text-rose">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                {submitError}
+              </div>
+            )}
+
+            {/* Submit button */}
+            <button
+              onClick={handleSubmitForReview}
+              disabled={submitting || !allChecksPassed || !attest}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-forest py-3.5 text-sm font-bold text-white tap-scale smooth hover:bg-forest-light disabled:opacity-40"
+            >
+              {submitting ? 'Submitting...' : 'Submit for Review'}
+              <Send size={16} />
+            </button>
+
+            {!attest && (
+              <p className="text-center text-[10px] text-ink-soft">
+                Please complete the attestation in the Attribution step first.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Next/Submit button */}
-      <div className="fixed bottom-16 left-0 right-0 z-30 px-5">
-        <div className="mx-auto max-w-md">
-          {step < 4 ? (
+      {/* Next button (steps 0-4) */}
+      {step < 5 && (
+        <div className="fixed bottom-16 left-0 right-0 z-30 px-5">
+          <div className="mx-auto max-w-md">
             <button
               onClick={next}
               disabled={!canProceed}
@@ -279,18 +531,36 @@ export function ContributeContent({ onBack, onComplete }: Props) {
               Continue
               <ChevronRight size={16} />
             </button>
-          ) : (
-            <button
-              onClick={submit}
-              disabled={submitting || !attest}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-forest py-3.5 text-sm font-bold text-white tap-scale smooth hover:bg-forest-light disabled:opacity-40"
-            >
-              {submitting ? 'Submitting...' : 'Submit Contribution'}
-              <Upload size={16} />
-            </button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Preview modal */}
+      <TranslationPreview
+        open={showPreview}
+        onClose={() => setShowPreview(false)}
+        sourceLang={schoolLang}
+        targetLang={homeLang}
+        title={translatedTitle}
+        sourceTitle={titleSchool}
+        sourceBody={bodySchool}
+        targetTitle={translatedTitle}
+        targetBody={translatedBody}
+        terms={terms}
+        onEdit={() => {
+          setShowPreview(false);
+          setStep(3);
+        }}
+        onSubmit={() => {
+          setShowPreview(false);
+          handleSubmitForReview();
+        }}
+        status={translationStatus}
+      />
     </div>
   );
+}
+
+function getLangNative(code: string): string {
+  return LANGUAGES.find((l) => l.code === code)?.nativeName || code;
 }
