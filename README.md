@@ -1,115 +1,51 @@
-🌐 Multilingual Study Module Platform
+# BhashaBridge
 
-Breaking language barriers in education by making learning content accessible in both primary and secondary languages.
+A multilingual learning platform designed to bridge the language gap between school education and a student's home language. BhashaBridge helps students, teachers, and parents understand educational content through primary and secondary language support.
 
-📖 Overview
+## 🌐 Platform Overview
 
-The Multilingual Study Module Platform is an educational web application designed to help students, teachers, and parents understand academic content without being limited by a single language.
+BhashaBridge connects **school textbook content** with the **learner's preferred home language**, making education easier to understand for students from different linguistic backgrounds.
 
-The platform provides study-based learning modules where educational content can be understood in both the learner's primary language and a secondary language. This helps improve comprehension, communication, and accessibility across different language backgrounds.
+The platform focuses on:
 
-The goal is simple:
+- 📚 Study-based learning modules
+- 🌐 Primary and secondary language support
+- 🔄 School-to-home language translation
+- 👨‍🎓 Student-friendly learning experience
+- 👨‍🏫 Teacher content contribution
+- 👨‍👩‍👧 Parent-friendly educational access
+- 🤖 AI-assisted translation
+- 📖 Multilingual textbook content
 
-Learn the concept → Understand it in your preferred language → Improve secondary-language understanding → Learn with confidence.
+---
 
-🎯 Problem Statement
+## 🏠 Home
 
-Language can become a major barrier to effective education when students, teachers, and parents are more comfortable with different languages.
+The home page introduces the purpose of BhashaBridge and provides quick access to learning content and content contribution.
 
-For example:
+The core idea is:
 
-A student may understand concepts better in their primary language.
+**School Language → BhashaBridge → Home Language**
 
-A teacher may deliver academic content in another language.
+This allows learners to understand textbook concepts in a language they are more comfortable with.
 
-Parents may struggle to understand the language used in their child's educational material.
+---
 
-This platform aims to reduce this communication gap by providing educational modules with multilingual learning support.
+## 📚 Study-Based Learning Modules
 
-💡 Our Solution
+BhashaBridge organizes educational content into structured learning modules.
 
-The platform introduces a study-module-based learning system where users can:
+Students can access learning material according to their subjects and topics while using language support to improve their understanding.
 
-📚 Access subject-wise study modules
+### Learning Flow
 
-🌐 Understand content in multiple languages
-
-🔄 Switch between primary and secondary languages
-
-👨‍🎓 Support student learning and comprehension
-
-👨‍🏫 Help teachers communicate academic concepts
-
-👨‍👩‍👧 Help parents understand their child's learning material
-
-📖 Learn concepts without being restricted by language barriers
-
-👥 Target Users
-
-👨‍🎓 Students
-
-Students can:
-
-Explore study modules
-
-Read educational content in their preferred language
-
-Switch between primary and secondary languages
-
-Improve understanding of difficult concepts
-
-Strengthen their secondary-language skills
-
-👨‍🏫 Teachers
-
-Teachers can:
-
-Present learning material in multiple languages
-
-Improve communication with students from different language backgrounds
-
-Make educational resources more accessible
-
-Support students who need additional language assistance
-
-👨‍👩‍👧 Parents
-
-Parents can:
-
-Understand their child's study material
-
-Access educational content in a familiar language
-
-Better communicate with teachers and students
-
-Support their child's learning at home
-
-🧩 Core Features
-
-📚 Study-Based Learning Modules
-
-Educational content is organized into structured modules based on subjects and topics.
-
-🌐 Multilingual Content
-
-Learning material can be understood through both the user's primary language and secondary language.
-
-🔄 Language Switching
-
-Users can switch between supported languages while studying.
-
-🎓 Student-Friendly Interface
-
-The interface focuses on simple navigation and easy access to learning resources.
-
-👨‍🏫 Teacher Support
-
-Teachers can use multilingual content to improve communication and explanation of concepts.
-
-👨‍👩‍👧 Parent Support
-
-Parents can access learning content in a language they understand more comfortably.
-
-📱 Responsive Design
-
-The platform is designed to provide a consistent experience across desktop, tablet, and mobile devices.
+```text
+Select Subject
+      ↓
+Select Study Module
+      ↓
+Choose Language
+      ↓
+Read Learning Content
+      ↓
+Understand the Concept
