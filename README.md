@@ -1,3 +1,10 @@
+SCREENSHOT 
+---
+
+<img width="208" height="293" alt="Screenshot 2026-09-21 162750" src="https://github.com/user-attachments/assets/362cf41a-fb20-471c-9c00-1f645aa8244a" />
+<img width="208" height="293" alt="Screenshot 2026-09-21 163051" src="https://github.com/user-attachments/assets/f59c0199-1cbb-438f-a69f-231311a2c508" />
+<img width="208" height="293" alt="Screenshot 2026-09-21 162931" src="https://github.com/user-attachments/assets/c2890442-1f4a-4c55-82ff-e472c1ae1a59" />
+
 # BhashaBridge
 
 A multilingual learning platform designed to bridge the language gap between school education and a student's home language. BhashaBridge helps students, teachers, and parents understand educational content through primary and secondary language support.
